@@ -1,6 +1,6 @@
 # Claude Desktop for Fedora 44
 
-Install **Claude Desktop on Fedora 44** as a native RPM, built from Anthropic's **official Linux x86_64 build**. Unmodified upstream payload, Chromium sandbox on, Claude Code and Cowork working. Tested on Fedora 44 with KDE Plasma (Wayland) and GNOME (Wayland); should work on Fedora 43 and later.
+Install **Claude Desktop on Fedora 44** as a native RPM, built from Anthropic's **official Linux x86_64 build**. Unmodified upstream payload, Chromium sandbox on, Claude Code and Cowork working. Tested on Fedora 44 with KDE Plasma (Wayland) and GNOME (Wayland); builds and installs on Fedora 45 too, and should work on Fedora 43.
 
 **TL;DR:** `./build-official.sh && sudo dnf install build/official/claude-desktop-*.rpm`
 
@@ -38,6 +38,8 @@ Run it yourself any time:
 sudo claude-desktop-update --check   # says whether a new build exists
 sudo claude-desktop-update           # rebuilds and installs if there is one
 ```
+
+COPR builds `claude-desktop-builder` per Fedora release, so a new release only gets the package once its chroot (e.g. `fedora-45-x86_64`) is enabled in the COPR project. Until then `dnf` reports a 404 for that repository; see [Troubleshooting](#copr-404-for-fedora-n-x86_64repodatarepomdxml-after-a-fedora-upgrade).
 
 Removing the package leaves Claude Desktop alone:
 
@@ -165,6 +167,15 @@ The index is past its `Valid-Until` date, which Anthropic sets a week after sign
 ### `'--ozone-platform=wayland' is not compatible with Vulkan`
 Chromium noise on Wayland sessions. Cosmetic; ignore.
 
+### COPR `404` for `fedora-N-x86_64/repodata/repomd.xml` after a Fedora upgrade
+The COPR project doesn't have a chroot for your new Fedora release yet ([#10](https://github.com/dewzor/claude-desktop-fedora/issues/10)). Claude Desktop itself is unaffected; only the `claude-desktop-builder` repository is missing. The package is `noarch` shell scripts with no release-specific dependencies, so until the chroot is enabled you can point the repo at the previous release:
+
+```bash
+sudo sed -i 's/\$releasever/44/g' /etc/yum.repos.d/_copr:copr.fedorainfracloud.org:dewzor:claude-desktop.repo
+```
+
+Undo it with `sudo dnf copr enable dewzor/claude-desktop` once the new chroot exists. Or skip COPR and run `./build-official.sh` by hand.
+
 ### Cowork says the VM sandbox is unavailable
 Install the optional VM stack: `sudo dnf install qemu-system-x86 edk2-ovmf virtiofsd`. The RPM lists these as `Suggests:`.
 
@@ -187,6 +198,9 @@ Known limits on current releases: the Claude Code tab doesn't work (see above), 
 
 ### Does Claude Desktop work on Fedora 44?
 Yes, tested on Fedora 44 with KDE Plasma (Wayland) and GNOME (Wayland).
+
+### Does it work on Fedora 45?
+Yes. On a clean Fedora 45 (rpm 6.1, GnuPG 2.4.9, dnf5) `build-official.sh` verifies the signed index, builds the RPM, and `dnf install` resolves every dependency with `chrome-sandbox` setuid intact; `claude-desktop-builder` also builds there unchanged. Users report the app itself working ([#10](https://github.com/dewzor/claude-desktop-fedora/issues/10)). For COPR auto-updates the `fedora-45-x86_64` chroot has to be enabled in the COPR project.
 
 ### Does it work on Fedora 43 or older?
 It should. The payload is self-contained (bundled Electron), so the only real constraint is the runtime dependency list, which resolves on 43. Not actively tested. If you try it, open an issue with what you see.

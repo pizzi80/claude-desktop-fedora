@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+**Fedora 45.** Requested in [#10](https://github.com/dewzor/claude-desktop-fedora/issues/10).
+
+- No script changes needed: on a clean Fedora 45 container `build-official.sh` verifies the signed index, builds `claude-desktop-5.11492.5-1.fc45`, and `dnf install` resolves all dependencies with the `chrome-sandbox` setuid bit intact. `copr/make-srpm.sh` and `rpmbuild --rebuild` of `claude-desktop-builder` also succeed there.
+- The `dnf` 404 in #10 comes from the COPR project having no `fedora-45-x86_64` chroot. The maintainer needs to enable it (COPR → Settings → Chroots) and rebuild `claude-desktop-builder`.
+- README: Fedora 45 in the FAQ, plus a troubleshooting entry for the COPR 404 with a temporary workaround.
+
 ## v9.3 (2026-10-22)
 
 **Your locale no longer matters.** Reported and fixed by [@anilsrml](https://github.com/anilsrml) in [#7](https://github.com/dewzor/claude-desktop-fedora/issues/7) and [#8](https://github.com/dewzor/claude-desktop-fedora/pull/8).
