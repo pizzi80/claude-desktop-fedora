@@ -21,6 +21,17 @@ Launch **Claude** from your application menu, or run `claude-desktop`. The launc
 
 The build runs entirely as your own user; root is only needed for the final `dnf install`.
 
+## Auto-updates without COPR
+
+`claude-desktop-up.sh` does the same job as the COPR builder from a plain clone: it builds and installs the current version, and installs a daily systemd timer that rebuilds when Anthropic ships a new one. Handy for a few machines, or while a new Fedora release has no COPR chroot yet.
+
+```bash
+git clone https://github.com/dewzor/claude-desktop-fedora.git && cd claude-desktop-fedora
+sudo ./claude-desktop-up.sh --install   # also removes the COPR builder and its .repo if present
+sudo claude-desktop-up --check          # exit 2 when an update is available
+sudo claude-desktop-up                  # update now
+```
+
 ## Auto-updates via COPR
 
 ```bash
