@@ -322,8 +322,7 @@ RES="usr/lib/claude-desktop/resources"
 EXTRA_FILES=""
 stage() {  # stage SRC-under-payload DEST-under-payload
     [ -f "$WORK/payload/$1" ] || { warn "not in this build, skipping: $1"; return 0; }
-    install -Dm644 "$WORK/payload/$1" "$WORK/payload/$2"
-    EXTRA_FILES+="/$2"$'\n'
+    install -Dm644 "$WORK/payload/$1" "$WORK/payload/$2"   # %files picks it up from the payload below
 }
 stage "$RES/linux-mime/com.anthropic.Claude.xml" \
       usr/share/mime/packages/com.anthropic.Claude.xml
@@ -338,12 +337,23 @@ if [ -f "$WORK/payload/usr/share/gnome-shell/search-providers/com.anthropic.Clau
 fi
 # The `ccd` launcher only ships in some builds; link it the way postinst does.
 # If a later payload ships /usr/bin/ccd itself, package that instead.
-if [ -e "$WORK/payload/usr/bin/ccd" ] || [ -L "$WORK/payload/usr/bin/ccd" ]; then
-    EXTRA_FILES+="/usr/bin/ccd"$'\n'
-elif [ -x "$WORK/payload/$RES/bin/ccd" ]; then
+if [ ! -e "$WORK/payload/usr/bin/ccd" ] && [ ! -L "$WORK/payload/usr/bin/ccd" ] \
+   && [ -x "$WORK/payload/$RES/bin/ccd" ]; then
     ln -s ../lib/claude-desktop/resources/bin/ccd "$WORK/payload/usr/bin/ccd"
-    EXTRA_FILES+="/usr/bin/ccd"$'\n'
 fi
+
+# %files is generated from the payload instead of written by hand: upstream adds
+# files over time (6.28899.6 added /usr/share/pixmaps/claude-desktop.png) and a
+# hand-written list fails the build with "Installed (but unpackaged) file(s)".
+# The app's own trees are owned whole in the spec; everything else is listed file
+# by file, so shared directories (/usr/share/applications, icons/hicolor, ...)
+# stay owned by the packages that own them.
+( cd "$WORK/payload" && find usr \( -type f -o -type l \) \
+      ! -path 'usr/lib/claude-desktop/*' \
+      ! -path 'usr/share/doc/claude-desktop/*' \
+      ! -path 'usr/share/lintian/*' \
+      -printf '"/%p"\n' | sort ) > "$WORK/payload-files.list"
+[ -s "$WORK/payload-files.list" ] || die "no files outside usr/lib/claude-desktop in the payload"
 
 # ------------------------------------------------------------ rpm build ------
 RB="$WORK/rpmbuild"
@@ -432,14 +442,10 @@ cp -a usr %{buildroot}/
 # Debian packaging metadata, meaningless on Fedora.
 rm -rf %{buildroot}%{_datadir}/lintian
 
-%files
-%dir %{_prefix}/lib/claude-desktop
-%{_prefix}/lib/claude-desktop/*
+%files -f $WORK/payload-files.list
+%{_prefix}/lib/claude-desktop
 # Chromium's SUID sandbox helper; upstream ships it 4755 and tar-as-user drops that.
 %attr(4755,root,root) %{_prefix}/lib/claude-desktop/chrome-sandbox
-%{_bindir}/claude-desktop
-%{_datadir}/applications/$DESKTOP_FILE
-%{_datadir}/icons/hicolor/*/apps/claude-desktop.png
 %{_datadir}/doc/claude-desktop
 $EXTRA_FILES
 %post
@@ -467,7 +473,8 @@ rpmbuild --define "_topdir $RB" \
     --define "_binary_payload w3.zstdio" \
     -bb "$RB/SPECS/claude-desktop.spec" \
     > "$WORK/rpmbuild.log" 2>&1 \
-    || { tail -30 "$WORK/rpmbuild.log" >&2; die "rpmbuild failed (full log: $WORK/rpmbuild.log)"; }
+    || { tail -30 "$WORK/rpmbuild.log" >&2; KEEP=1   # keep the tree, or the log named below is already gone
+         die "rpmbuild failed (full log: $WORK/rpmbuild.log)"; }
 
 RPM="$(find "$RB/RPMS" -name '*.rpm' -print -quit)"
 [ -n "$RPM" ] || die "rpmbuild reported success but produced no RPM"
